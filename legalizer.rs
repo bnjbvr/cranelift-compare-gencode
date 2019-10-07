@@ -2064,7 +2064,7 @@ pub fn widen(
     {
         match pos.func.dfg[inst].opcode() {
             ir::Opcode::Band => {
-                // Unwrap a << band.i8(b, c)
+                // Unwrap a << band(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2073,48 +2073,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().band(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << band.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().band(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2123,7 +2100,7 @@ pub fn widen(
             }
 
             ir::Opcode::BandImm => {
-                // Unwrap a << band_imm.i8(b, c)
+                // Unwrap a << band_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -2134,48 +2111,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().band_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << band_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().band_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2184,7 +2135,7 @@ pub fn widen(
             }
 
             ir::Opcode::BandNot => {
-                // Unwrap a << band_not.i8(b, c)
+                // Unwrap a << band_not(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2193,48 +2144,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().band_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << band_not.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().band_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2243,7 +2171,7 @@ pub fn widen(
             }
 
             ir::Opcode::Bint => {
-                // Unwrap a << bint.i8(b)
+                // Unwrap a << bint(b)
                 let (b, predicate) = if let crate::ir::InstructionData::Unary {
                     arg,
                     ..
@@ -2252,46 +2180,21 @@ pub fn widen(
                     let args = [arg];
                     (
                         func.dfg.resolve_aliases(args[0]),
-                        func.dfg.ctrl_typevar(inst) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
                 let typeof_b = pos.func.dfg.value_type(b);
-                // Results handled by a << ireduce.i8(x).
+                // Results handled by a << ireduce(x).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_a must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_a);
                 if predicate {
                     let x = pos.ins().bint(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, x);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bint.i16(b)
-                let (b, predicate) = if let crate::ir::InstructionData::Unary {
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.ctrl_typevar(inst) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                let typeof_b = pos.func.dfg.value_type(b);
-                // Results handled by a << ireduce.i16(x).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().bint(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, x);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_a, x);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2386,7 +2289,7 @@ pub fn widen(
             }
 
             ir::Opcode::Bnot => {
-                // Unwrap a << bnot.i8(b)
+                // Unwrap a << bnot(b)
                 let (b, predicate) = if let crate::ir::InstructionData::Unary {
                     arg,
                     ..
@@ -2395,46 +2298,24 @@ pub fn widen(
                     let args = [arg];
                     (
                         func.dfg.resolve_aliases(args[0]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().bnot(x);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bnot.i16(b)
-                let (b, predicate) = if let crate::ir::InstructionData::Unary {
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().bnot(x);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2443,7 +2324,7 @@ pub fn widen(
             }
 
             ir::Opcode::Bor => {
-                // Unwrap a << bor.i8(b, c)
+                // Unwrap a << bor(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2452,48 +2333,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().bor(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bor.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().bor(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2502,7 +2360,7 @@ pub fn widen(
             }
 
             ir::Opcode::BorImm => {
-                // Unwrap a << bor_imm.i8(b, c)
+                // Unwrap a << bor_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -2513,48 +2371,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().bor_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bor_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().bor_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2563,7 +2395,7 @@ pub fn widen(
             }
 
             ir::Opcode::BorNot => {
-                // Unwrap a << bor_not.i8(b, c)
+                // Unwrap a << bor_not(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2572,48 +2404,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().bor_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bor_not.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().bor_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2622,7 +2431,7 @@ pub fn widen(
             }
 
             ir::Opcode::BrTable => {
-                // Unwrap () << br_table.i8(x, y, z)
+                // Unwrap () << br_table(x, y, z)
                 let (x, y, z, predicate) = if let crate::ir::InstructionData::BranchTable {
                     destination,
                     table,
@@ -2635,38 +2444,14 @@ pub fn widen(
                         func.dfg.resolve_aliases(args[0]),
                         destination,
                         table,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                if predicate {
-                    pos.func.dfg.clear_results(inst);
-                    let b = pos.ins().uextend(ir::types::I32, x);
-                    pos.ins().br_table(b, y, z);
-                    let removed = pos.remove_inst();
-                    debug_assert_eq!(removed, inst);
-                    cfg.recompute_ebb(pos.func, pos.current_ebb().unwrap());
-                    return true;
-                }
-                // Unwrap () << br_table.i16(x, y, z)
-                let (x, y, z, predicate) = if let crate::ir::InstructionData::BranchTable {
-                    destination,
-                    table,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        destination,
-                        table,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
+                let typeof_x = pos.func.dfg.value_type(x);
+                // typeof_x must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_x);
                 if predicate {
                     pos.func.dfg.clear_results(inst);
                     let b = pos.ins().uextend(ir::types::I32, x);
@@ -2679,7 +2464,7 @@ pub fn widen(
             }
 
             ir::Opcode::Bxor => {
-                // Unwrap a << bxor.i8(b, c)
+                // Unwrap a << bxor(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2688,48 +2473,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().bxor(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bxor.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().bxor(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2738,7 +2500,7 @@ pub fn widen(
             }
 
             ir::Opcode::BxorImm => {
-                // Unwrap a << bxor_imm.i8(b, c)
+                // Unwrap a << bxor_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -2749,48 +2511,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().bxor_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bxor_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().bxor_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -2799,7 +2535,7 @@ pub fn widen(
             }
 
             ir::Opcode::BxorNot => {
-                // Unwrap a << bxor_not.i8(b, c)
+                // Unwrap a << bxor_not(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -2808,48 +2544,25 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[0].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().bxor_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << bxor_not.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().bxor_not(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -3035,7 +2748,7 @@ pub fn widen(
             }
 
             ir::Opcode::Iadd => {
-                // Unwrap a << iadd.i8(b, c)
+                // Unwrap a << iadd(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -3044,48 +2757,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().iadd(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << iadd.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().iadd(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -3094,7 +2782,7 @@ pub fn widen(
             }
 
             ir::Opcode::IaddImm => {
-                // Unwrap a << iadd_imm.i8(b, c)
+                // Unwrap a << iadd_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -3105,48 +2793,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().iadd_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << iadd_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().iadd_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -3155,7 +2817,7 @@ pub fn widen(
             }
 
             ir::Opcode::Icmp => {
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::Equal, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::Equal, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3166,15 +2828,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::Equal, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3184,7 +2851,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::NotEqual, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::NotEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3195,15 +2862,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::NotEqual, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3213,7 +2885,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3224,15 +2896,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedGreaterThan, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3242,7 +2919,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::UnsignedLessThan, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::UnsignedLessThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3253,15 +2930,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedLessThan, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3271,7 +2953,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3282,15 +2964,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3300,7 +2987,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3311,15 +2998,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
@@ -3329,7 +3021,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::SignedGreaterThan, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::SignedGreaterThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3340,15 +3032,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp(ir::condcodes::IntCC::SignedGreaterThan, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
@@ -3358,7 +3055,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::SignedLessThan, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::SignedLessThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3369,15 +3066,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp(ir::condcodes::IntCC::SignedLessThan, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
@@ -3387,7 +3089,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3398,15 +3100,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
@@ -3416,7 +3123,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp.i8(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
+                // Unwrap a << icmp(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
                     cond,
                     ref args,
@@ -3427,305 +3134,20 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp(ir::condcodes::IntCC::SignedLessThanOrEqual, x, y).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::SignedLessThanOrEqual, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::Equal, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::Equal, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::Equal, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::NotEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::NotEqual, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::NotEqual, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedGreaterThan, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::UnsignedGreaterThan, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::UnsignedLessThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedLessThan, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::UnsignedLessThan, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp.i32(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::SignedGreaterThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp(ir::condcodes::IntCC::SignedGreaterThan, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::SignedGreaterThan, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::SignedLessThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp(ir::condcodes::IntCC::SignedLessThan, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::SignedLessThan, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let a = pos.func.dfg.replace(inst).icmp(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, y);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp.i16(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompare {
-                    cond,
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp(ir::condcodes::IntCC::SignedLessThanOrEqual, x, y).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32, 64, 128})
+                let predicate = predicate && TYPE_SETS[1].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
@@ -3738,7 +3160,7 @@ pub fn widen(
             }
 
             ir::Opcode::IcmpImm => {
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::Equal, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::Equal, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3751,15 +3173,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::Equal, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::Equal, x, c);
@@ -3768,7 +3193,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::NotEqual, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::NotEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3781,15 +3206,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::NotEqual, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::NotEqual, x, c);
@@ -3798,7 +3226,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3811,15 +3239,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThan, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThan, x, c);
@@ -3828,7 +3259,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::UnsignedLessThan, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3841,15 +3272,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThan, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedLessThan, x, c);
@@ -3858,7 +3292,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3871,15 +3305,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, c);
@@ -3888,7 +3325,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3901,15 +3338,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, c);
@@ -3918,7 +3358,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::SignedGreaterThan, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3931,15 +3371,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThan, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedGreaterThan, x, c);
@@ -3948,7 +3391,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::SignedLessThan, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::SignedLessThan, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3961,15 +3404,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedLessThan, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedLessThan, x, c);
@@ -3978,7 +3424,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -3991,15 +3437,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, c);
@@ -4008,7 +3457,7 @@ pub fn widen(
                     }
                     return true;
                 }
-                // Unwrap a << icmp_imm.i8(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
+                // Unwrap a << icmp_imm(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
                 let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
                     cond,
                     imm,
@@ -4021,315 +3470,18 @@ pub fn widen(
                         cond,
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I8
+                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual)
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedLessThanOrEqual, x, c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedLessThanOrEqual, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::Equal, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::Equal) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::Equal, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::Equal, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::NotEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::NotEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::NotEqual, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::NotEqual, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::UnsignedGreaterThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThan, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThan, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::UnsignedLessThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThan, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedLessThan, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::UnsignedLessThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::UnsignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::UnsignedLessThanOrEqual, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::SignedGreaterThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThan, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedGreaterThan, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::SignedLessThan, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThan) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedLessThan, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedLessThan, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::SignedGreaterThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedGreaterThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedGreaterThanOrEqual, x, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << icmp_imm.i16(ir::condcodes::IntCC::SignedLessThanOrEqual, b, c)
-                let (_, b, c, predicate) = if let crate::ir::InstructionData::IntCompareImm {
-                    cond,
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        cond,
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        predicates::is_equal(cond, ir::condcodes::IntCC::SignedLessThanOrEqual) && func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << icmp_imm(ir::condcodes::IntCC::SignedLessThanOrEqual, x, c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let a = pos.func.dfg.replace(inst).icmp_imm(ir::condcodes::IntCC::SignedLessThanOrEqual, x, c);
@@ -4341,7 +3493,7 @@ pub fn widen(
             }
 
             ir::Opcode::Iconst => {
-                // Unwrap a << iconst.i8(b)
+                // Unwrap a << iconst(b)
                 let (b, predicate) = if let crate::ir::InstructionData::UnaryImm {
                     imm,
                     ..
@@ -4349,43 +3501,20 @@ pub fn widen(
                     let func = &pos.func;
                     (
                         imm,
-                        func.dfg.ctrl_typevar(inst) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(c).
+                // Results handled by a << ireduce(c).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_a must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_a);
                 if predicate {
                     let c = pos.ins().iconst(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, c);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << iconst.i16(b)
-                let (b, predicate) = if let crate::ir::InstructionData::UnaryImm {
-                    imm,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        imm,
-                        func.dfg.ctrl_typevar(inst) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(c).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let c = pos.ins().iconst(ir::types::I32, b);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, c);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_a, c);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4394,7 +3523,7 @@ pub fn widen(
             }
 
             ir::Opcode::Imul => {
-                // Unwrap a << imul.i8(b, c)
+                // Unwrap a << imul(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -4403,48 +3532,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().imul(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << imul.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().imul(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4453,7 +3557,7 @@ pub fn widen(
             }
 
             ir::Opcode::ImulImm => {
-                // Unwrap a << imul_imm.i8(b, c)
+                // Unwrap a << imul_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -4464,48 +3568,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().imul_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << imul_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().imul_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4514,7 +3592,7 @@ pub fn widen(
             }
 
             ir::Opcode::IrsubImm => {
-                // Unwrap a << irsub_imm.i8(b, c)
+                // Unwrap a << irsub_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -4525,48 +3603,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().irsub_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << irsub_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().irsub_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4575,7 +3627,7 @@ pub fn widen(
             }
 
             ir::Opcode::Ishl => {
-                // Unwrap a << ishl.i8(b, c)
+                // Unwrap a << ishl(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -4584,48 +3636,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i8(z).
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().ishl(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << ishl.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().ishl(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4634,7 +3661,7 @@ pub fn widen(
             }
 
             ir::Opcode::IshlImm => {
-                // Unwrap a << ishl_imm.i8(b, c)
+                // Unwrap a << ishl_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -4645,48 +3672,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().ishl_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << ishl_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().ishl_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4695,7 +3696,7 @@ pub fn widen(
             }
 
             ir::Opcode::Isub => {
-                // Unwrap a << isub.i8(b, c)
+                // Unwrap a << isub(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -4704,48 +3705,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().isub(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << isub.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().isub(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4819,7 +3795,7 @@ pub fn widen(
             }
 
             ir::Opcode::Popcnt => {
-                // Unwrap a << popcnt.i8(b)
+                // Unwrap a << popcnt(b)
                 let (b, predicate) = if let crate::ir::InstructionData::Unary {
                     arg,
                     ..
@@ -4828,46 +3804,22 @@ pub fn widen(
                     let args = [arg];
                     (
                         func.dfg.resolve_aliases(args[0]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().popcnt(x);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << popcnt.i16(b)
-                let (b, predicate) = if let crate::ir::InstructionData::Unary {
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().popcnt(x);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4876,7 +3828,7 @@ pub fn widen(
             }
 
             ir::Opcode::Sdiv => {
-                // Unwrap a << sdiv.i8(b, c)
+                // Unwrap a << sdiv(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -4885,48 +3837,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
                     let z = pos.ins().sdiv(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << sdiv.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let z = pos.ins().sdiv(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -4935,7 +3862,7 @@ pub fn widen(
             }
 
             ir::Opcode::SdivImm => {
-                // Unwrap a << sdiv_imm.i8(b, c)
+                // Unwrap a << sdiv_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -4946,48 +3873,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let z = pos.ins().sdiv_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << sdiv_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let z = pos.ins().sdiv_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5025,7 +3926,7 @@ pub fn widen(
             }
 
             ir::Opcode::Srem => {
-                // Unwrap a << srem.i8(b, c)
+                // Unwrap a << srem(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -5034,48 +3935,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let y = pos.ins().sextend(ir::types::I32, c);
                     let z = pos.ins().srem(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << srem.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let y = pos.ins().sextend(ir::types::I32, c);
-                    let z = pos.ins().srem(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5084,7 +3960,7 @@ pub fn widen(
             }
 
             ir::Opcode::SremImm => {
-                // Unwrap a << srem_imm.i8(b, c)
+                // Unwrap a << srem_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -5095,48 +3971,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let z = pos.ins().srem_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << srem_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let z = pos.ins().srem_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5145,7 +3995,7 @@ pub fn widen(
             }
 
             ir::Opcode::Sshr => {
-                // Unwrap a << sshr.i8(b, c)
+                // Unwrap a << sshr(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -5154,48 +4004,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i8(z).
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let z = pos.ins().sshr(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << sshr.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let z = pos.ins().sshr(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5204,7 +4029,7 @@ pub fn widen(
             }
 
             ir::Opcode::SshrImm => {
-                // Unwrap a << sshr_imm.i8(b, c)
+                // Unwrap a << sshr_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -5215,48 +4040,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().sextend(ir::types::I32, b);
                     let z = pos.ins().sshr_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << sshr_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().sextend(ir::types::I32, b);
-                    let z = pos.ins().sshr_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5322,7 +4121,7 @@ pub fn widen(
             }
 
             ir::Opcode::Udiv => {
-                // Unwrap a << udiv.i8(b, c)
+                // Unwrap a << udiv(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -5331,48 +4130,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().udiv(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << udiv.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().udiv(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5381,7 +4155,7 @@ pub fn widen(
             }
 
             ir::Opcode::UdivImm => {
-                // Unwrap a << udiv_imm.i8(b, c)
+                // Unwrap a << udiv_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -5392,48 +4166,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().udiv_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << udiv_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().udiv_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5471,7 +4219,7 @@ pub fn widen(
             }
 
             ir::Opcode::Urem => {
-                // Unwrap a << urem.i8(b, c)
+                // Unwrap a << urem(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -5480,48 +4228,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let y = pos.ins().uextend(ir::types::I32, c);
                     let z = pos.ins().urem(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << urem.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let y = pos.ins().uextend(ir::types::I32, c);
-                    let z = pos.ins().urem(x, y);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5530,7 +4253,7 @@ pub fn widen(
             }
 
             ir::Opcode::UremImm => {
-                // Unwrap a << urem_imm.i8(b, c)
+                // Unwrap a << urem_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -5541,48 +4264,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().urem_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << urem_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().urem_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5591,7 +4288,7 @@ pub fn widen(
             }
 
             ir::Opcode::Ushr => {
-                // Unwrap a << ushr.i8(b, c)
+                // Unwrap a << ushr(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
                     ref args,
                     ..
@@ -5600,48 +4297,23 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
+                let typeof_b = pos.func.dfg.value_type(b);
                 let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i8(z).
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().ushr(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << ushr.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::Binary {
-                    ref args,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        func.dfg.resolve_aliases(args[1]),
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                let typeof_c = pos.func.dfg.value_type(c);
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().ushr(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5650,7 +4322,7 @@ pub fn widen(
             }
 
             ir::Opcode::UshrImm => {
-                // Unwrap a << ushr_imm.i8(b, c)
+                // Unwrap a << ushr_imm(b, c)
                 let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
                     imm,
                     arg,
@@ -5661,48 +4333,22 @@ pub fn widen(
                     (
                         func.dfg.resolve_aliases(args[0]),
                         imm,
-                        func.dfg.value_type(args[0]) == ir::types::I8
+                        true
                     )
                 } else {
                     unreachable!("bad instruction format")
                 };
-                // Results handled by a << ireduce.i8(z).
+                let typeof_b = pos.func.dfg.value_type(b);
+                // Results handled by a << ireduce(z).
                 let r = pos.func.dfg.inst_results(inst);
                 let a = &r[0];
                 let typeof_a = pos.func.dfg.value_type(*a);
+                // typeof_b must belong to TypeSet(lanes={1}, ints={8, 16, 32})
+                let predicate = predicate && TYPE_SETS[4].contains(typeof_b);
                 if predicate {
                     let x = pos.ins().uextend(ir::types::I32, b);
                     let z = pos.ins().ushr_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I8, z);
-                    if pos.current_inst() == Some(inst) {
-                        pos.next_inst();
-                    }
-                    return true;
-                }
-                // Unwrap a << ushr_imm.i16(b, c)
-                let (b, c, predicate) = if let crate::ir::InstructionData::BinaryImm {
-                    imm,
-                    arg,
-                    ..
-                } = pos.func.dfg[inst] {
-                    let func = &pos.func;
-                    let args = [arg];
-                    (
-                        func.dfg.resolve_aliases(args[0]),
-                        imm,
-                        func.dfg.value_type(args[0]) == ir::types::I16
-                    )
-                } else {
-                    unreachable!("bad instruction format")
-                };
-                // Results handled by a << ireduce.i16(z).
-                let r = pos.func.dfg.inst_results(inst);
-                let a = &r[0];
-                let typeof_a = pos.func.dfg.value_type(*a);
-                if predicate {
-                    let x = pos.ins().uextend(ir::types::I32, b);
-                    let z = pos.ins().ushr_imm(x, c);
-                    let a = pos.func.dfg.replace(inst).ireduce(ir::types::I16, z);
+                    let a = pos.func.dfg.replace(inst).ireduce(typeof_b, z);
                     if pos.current_inst() == Some(inst) {
                         pos.next_inst();
                     }
@@ -5717,7 +4363,7 @@ pub fn widen(
 }
 
 // Table of value type sets.
-const TYPE_SETS: [ir::instructions::ValueTypeSet; 4] = [
+const TYPE_SETS: [ir::instructions::ValueTypeSet; 5] = [
     ir::instructions::ValueTypeSet {
         // TypeSet(lanes={1, 2, 4, 8, 16, 32, 64, 128, 256}, ints={8, 16, 32, 64, 128})
         lanes: BitSet::<u16>(511),
@@ -5746,6 +4392,14 @@ const TYPE_SETS: [ir::instructions::ValueTypeSet; 4] = [
         // TypeSet(lanes={1}, ints={16, 32, 64, 128})
         lanes: BitSet::<u16>(1),
         ints: BitSet::<u8>(240),
+        floats: BitSet::<u8>(0),
+        bools: BitSet::<u8>(0),
+        refs: BitSet::<u8>(0),
+    },
+    ir::instructions::ValueTypeSet {
+        // TypeSet(lanes={1}, ints={8, 16, 32})
+        lanes: BitSet::<u16>(1),
+        ints: BitSet::<u8>(56),
         floats: BitSet::<u8>(0),
         bools: BitSet::<u8>(0),
         refs: BitSet::<u8>(0),
